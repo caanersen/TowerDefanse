@@ -9,8 +9,8 @@ size = Vector2(48, 48)
 rotates = false
 loop = false
 script = ExtResource("1_script")
-speed = 50.0
-max_health = 70
+speed = 30.0
+max_health = 800
 gold_reward = 10
 
 [node name="Sprite" type="ColorRect" parent="."]

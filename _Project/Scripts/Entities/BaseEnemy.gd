@@ -86,10 +86,10 @@ func show_floating_text(text: String, color: Color = Color.RED) -> void:
 	get_tree().root.add_child(label)
 	
 	# Basit tween animasyonu (Yukarı çık ve kaybol)
-	var tween = create_tween()
+	# Label Root'a ekli olduğu için, Tween'i Label üzerinden oluşturmalıyız.
+	# Enemy (self) ölürse, self'e bağlı Tween de ölür.
+	var tween = label.create_tween()
 	tween.tween_property(label, "position", label.position + Vector2(0, -50), 1.0)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, 1.0)
-	tween.tween_callback(label.queue_free)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 1.0)
 	tween.tween_callback(label.queue_free)
 

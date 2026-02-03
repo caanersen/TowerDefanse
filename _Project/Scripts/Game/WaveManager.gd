@@ -6,6 +6,8 @@ signal on_enemy_reward(amount)
 
 @export var goblin_scene: PackedScene
 @export var troll_scene: PackedScene
+@export var warg_scene: PackedScene # Editor'den atanamazsa initialize'da yüklenir
+
 # Export artık gerekli değil veya boş olabilir, initialize ile atanacak
 var spawn_path: Path2D 
 
@@ -24,6 +26,8 @@ func _ready() -> void:
 
 func initialize(path_node: Path2D) -> void:
 	spawn_path = path_node
+	if warg_scene == null:
+		warg_scene = load("res://_Project/Scenes/Entities/Enemies/Warg.tscn")
 	print("WaveManager initialized with path.")
 
 func start_next_wave() -> void:
@@ -31,7 +35,7 @@ func start_next_wave() -> void:
 	var base_count = 10
 	# Formül: Linear Scaling. Her wave +5 düşman.
 	# Wave 1: 10, Wave 2: 15, ..., Wave 10: 55
-	enemies_to_spawn = 10 + (current_wave - 1) * 5
+	enemies_to_spawn = base_count + (current_wave - 1) * 5
 	
 	emit_signal("wave_started", current_wave)
 	print("Wave ", current_wave, " started! Enemies: ", enemies_to_spawn)
@@ -44,10 +48,31 @@ func _spawn_enemy() -> void:
 	
 	var enemy_instance
 	
-	if current_wave == 10 and enemies_to_spawn <= 2:
-		enemy_instance = troll_scene.instantiate()
-		print("Spawning Troll!")
+	# WAVE LOGIC
+	if current_wave == 10:
+		# BOSS WAVE
+		if enemies_to_spawn <= 5: # Son 5 düşman Troll
+			enemy_instance = troll_scene.instantiate()
+		else:
+			# Geri kalanı Warg sürüsü
+			enemy_instance = warg_scene.instantiate()
+	
+	elif current_wave >= 8:
+		# HARD WAVES (Warg + Troll + Goblin)
+		var roll = randf()
+		if roll < 0.4: enemy_instance = warg_scene.instantiate()
+		elif roll < 0.5: enemy_instance = troll_scene.instantiate() # Nadir Troll
+		else: enemy_instance = goblin_scene.instantiate()
+		
+	elif current_wave >= 5:
+		# MID WAVES (Goblin + Warg)
+		if randf() < 0.3: # %30 Warg
+			enemy_instance = warg_scene.instantiate()
+		else:
+			enemy_instance = goblin_scene.instantiate()
+	
 	else:
+		# EASY WAVES
 		enemy_instance = goblin_scene.instantiate()
 	
 	if enemy_instance:

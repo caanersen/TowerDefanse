@@ -339,6 +339,7 @@ func _draw() -> void:
 		# Kule engeli kontrolü (Visual sadece)
 		var is_blocked = false
 		for tower in towers_container.get_children():
+			if not tower is BaseTower: continue
 			if tower.position.distance_to(cell_pos) < 64.0:
 				is_blocked = true
 				break

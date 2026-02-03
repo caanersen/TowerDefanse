@@ -86,6 +86,10 @@ func _find_new_target() -> void:
 	enemies_in_range = enemies_in_range.filter(func(e): return is_instance_valid(e))
 	
 	for enemy in enemies_in_range:
+		# Extra mesafe kontrolü (Area2D bazen kaçırabilir)
+		if global_position.distance_to(enemy.global_position) > attack_range + 50.0:
+			continue
+			
 		if enemy.progress > max_progress:
 			max_progress = enemy.progress
 			best_target = enemy
@@ -98,7 +102,7 @@ func _attack() -> void:
 		if projectile_scene:
 			var projectile = projectile_scene.instantiate()
 			projectile.global_position = global_position
-			get_tree().root.add_child(projectile)
+			get_tree().current_scene.add_child(projectile)
 			projectile.initialize(target, damage)
 		else:
 			target.take_damage(damage)
