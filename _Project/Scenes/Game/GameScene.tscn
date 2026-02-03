@@ -1,0 +1,111 @@
+[gd_scene load_steps=7 format=3 uid="uid://game123"]
+
+[ext_resource type="Script" uid="uid://c2y8t65i2wjmj" path="res://_Project/Scripts/Game/LevelController.gd" id="1_controller"]
+[ext_resource type="Script" uid="uid://cbkf4hxn1e02m" path="res://_Project/Scripts/Game/WaveManager.gd" id="1_manager"]
+[ext_resource type="PackedScene" uid="uid://goblin123" path="res://_Project/Scenes/Entities/Enemies/Goblin.tscn" id="2_goblin"]
+[ext_resource type="PackedScene" uid="uid://troll123" path="res://_Project/Scenes/Entities/Enemies/Troll.tscn" id="3_troll"]
+[ext_resource type="PackedScene" uid="uid://rcher123" path="res://_Project/Scenes/Entities/Towers/ArcherTower.tscn" id="4_archer"]
+[ext_resource type="PackedScene" uid="uid://mage123" path="res://_Project/Scenes/Entities/Towers/MageTower.tscn" id="5_mage"]
+
+[node name="GameScene" type="Node2D" node_paths=PackedStringArray("towers_container")]
+script = ExtResource("1_controller")
+archer_tower_scene = ExtResource("4_archer")
+mage_tower_scene = ExtResource("5_mage")
+towers_container = NodePath("Towers")
+
+[node name="MapHolder" type="Node2D" parent="."]
+
+[node name="WaveManager" type="Node" parent="."]
+script = ExtResource("1_manager")
+goblin_scene = ExtResource("2_goblin")
+troll_scene = ExtResource("3_troll")
+
+[node name="Towers" type="Node2D" parent="."]
+
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="HBoxInfo" type="HBoxContainer" parent="UI"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 400.0
+offset_bottom = 60.0
+theme_override_constants/separation = 40
+
+[node name="WaveLabel" type="Label" parent="UI/HBoxInfo"]
+layout_mode = 2
+text = "Wave: 1"
+
+[node name="GoldLabel" type="Label" parent="UI/HBoxInfo"]
+layout_mode = 2
+text = "Gold: 0"
+
+[node name="HealthLabel" type="Label" parent="UI/HBoxInfo"]
+layout_mode = 2
+text = "Health: 20"
+
+[node name="GameOverPanel" type="PanelContainer" parent="UI"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -50.0
+offset_right = 100.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/GameOverPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="UI/GameOverPanel/VBox"]
+layout_mode = 2
+text = "GAME OVER"
+horizontal_alignment = 1
+
+[node name="RestartBtn" type="Button" parent="UI/GameOverPanel/VBox"]
+layout_mode = 2
+text = "Menüye Dön"
+
+[node name="BottomPanel" type="PanelContainer" parent="UI"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -100.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HBox" type="HBoxContainer" parent="UI/BottomPanel"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="BuildButtons" type="HBoxContainer" parent="UI/BottomPanel/HBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ArcherBtn" type="Button" parent="UI/BottomPanel/HBox/BuildButtons"]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+text = "Okçu Kulesi"
+
+[node name="MageBtn" type="Button" parent="UI/BottomPanel/HBox/BuildButtons"]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+text = "Büyücü Kulesi"
+
+[node name="UpgradePanel" type="PanelContainer" parent="UI"]
+visible = false
+offset_right = 150.0
+offset_bottom = 50.0
+mouse_filter = 2
+
+[node name="UpgradeBtn" type="Button" parent="UI/UpgradePanel"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+text = "Yükselt (100g)"

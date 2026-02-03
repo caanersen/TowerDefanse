@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3 uid="uid://goblin123"]
+
+[ext_resource type="Script" path="res://_Project/Scripts/Entities/BaseEnemy.gd" id="1_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_goblin"]
+size = Vector2(32, 32)
+
+[node name="Goblin" type="PathFollow2D"]
+rotates = false
+loop = false
+script = ExtResource("1_script")
+speed = 50.0
+max_health = 150
+gold_reward = 5
+
+[node name="Sprite" type="ColorRect" parent="."]
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+color = Color(1, 0, 0, 1)
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_goblin")
