@@ -41,10 +41,13 @@ func start_next_wave() -> void:
 	var base_count = 10
 	var scaling = 5
 	
-	# LEVEL 2 ZORLUK AYARI
+	# LEVEL ZORLUK AYARLARI
 	if GameManager.selected_level == 2:
 		base_count = 15 # Daha kalabalık başla
 		scaling = 8 # Daha hızlı art
+	elif GameManager.selected_level == 3:
+		base_count = 20 # Çok kalabalık başla
+		scaling = 10 # Brutal artış
 	
 	enemies_to_spawn = base_count + (current_wave - 1) * scaling
 	
@@ -66,6 +69,7 @@ func _spawn_enemy() -> void:
 	
 	var max_waves = 10
 	if level == 2: max_waves = 13
+	elif level == 3: max_waves = 15
 	
 	if current_wave == max_waves:
 		# FINAL BOSS WAVE
@@ -74,6 +78,14 @@ func _spawn_enemy() -> void:
 		else:
 			enemy_instance = warg_scene.instantiate() # Geri kalanı Warg
 	
+	elif current_wave > 12 and level == 3:
+		# LEVEL 3 ENDGAME (13, 14, 15) -> Nightmare Loop
+		# Black Knight (%30) + Troll (%30) + Gargoyle (%40)
+		var r = randf()
+		if r < 0.3: enemy_instance = black_knight_scene.instantiate()
+		elif r < 0.6: enemy_instance = troll_scene.instantiate()
+		else: enemy_instance = gargoyle_scene.instantiate()
+
 	elif current_wave > 10 and level == 2:
 		# LEVEL 2 EXTRA WAVES (11, 12) -> Full Kaos + Flying + Armored
 		var r = randf()
@@ -138,6 +150,7 @@ func _on_wave_completed() -> void:
 	
 	var max_waves = 10
 	if GameManager.selected_level == 2: max_waves = 13
+	elif GameManager.selected_level == 3: max_waves = 15
 	
 	if current_wave >= max_waves:
 		# Oyun Bitti (Kazanıldı)
