@@ -48,6 +48,9 @@ func start_next_wave() -> void:
 	elif GameManager.selected_level == 3:
 		base_count = 20 # Çok kalabalık başla
 		scaling = 10 # Brutal artış
+	elif GameManager.selected_level == 4:
+		base_count = 22 
+		scaling = 11 # L3'ten bir tık daha zor
 	
 	enemies_to_spawn = base_count + (current_wave - 1) * scaling
 	
@@ -70,6 +73,7 @@ func _spawn_enemy() -> void:
 	var max_waves = 10
 	if level == 2: max_waves = 13
 	elif level == 3: max_waves = 15
+	elif level == 4: max_waves = 20
 	
 	if current_wave == max_waves:
 		# FINAL BOSS WAVE
@@ -78,6 +82,22 @@ func _spawn_enemy() -> void:
 		else:
 			enemy_instance = warg_scene.instantiate() # Geri kalanı Warg
 	
+	elif current_wave > 15 and level == 4:
+		# LEVEL 4 ENDGAME (16-20) -> HEAVY SIEGE
+		# Sadece Tanklar ve Zırhlılar. Oyuncunun DPS'ini test eder.
+		var r = randf()
+		if r < 0.4: enemy_instance = black_knight_scene.instantiate() # %40 BK
+		elif r < 0.7: enemy_instance = troll_scene.instantiate() # %30 Troll
+		else: enemy_instance = warg_scene.instantiate() # %30 Warg (Hızlı destek)
+
+	elif current_wave > 5 and level == 4:
+		# LEVEL 4: SPLIT PRESSURE (Sürekli baskı)
+		var r = randf()
+		if r < 0.25: enemy_instance = black_knight_scene.instantiate() # Zırhlı (%25)
+		elif r < 0.50: enemy_instance = warg_scene.instantiate() # Hızlı (%25)
+		elif r < 0.60: enemy_instance = gargoyle_scene.instantiate() # Uçan (%10)
+		else: enemy_instance = goblin_scene.instantiate() # Bol miktarda Goblin (%40) sürüsü
+
 	elif current_wave > 12 and level == 3:
 		# LEVEL 3 ENDGAME (13, 14, 15) -> Nightmare Loop
 		# Black Knight (%30) + Troll (%30) + Gargoyle (%40)
@@ -151,6 +171,7 @@ func _on_wave_completed() -> void:
 	var max_waves = 10
 	if GameManager.selected_level == 2: max_waves = 13
 	elif GameManager.selected_level == 3: max_waves = 15
+	elif GameManager.selected_level == 4: max_waves = 20 # 20 Dalga (Uzun Savaş)
 	
 	if current_wave >= max_waves:
 		# Oyun Bitti (Kazanıldı)

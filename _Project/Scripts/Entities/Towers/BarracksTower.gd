@@ -33,28 +33,49 @@ func _ready():
 func _calculate_rally_point() -> void:
 	rally_point = global_position # Default: Kule altı
 	
-	# Sahnedeki PathLine'ı bulmaya çalış
-	var path_line = get_tree().current_scene.find_child("PathLine", true, false)
-	if path_line and path_line is Line2D:
-		var points = path_line.points
-		var min_dist = 10000.0
-		var best_point = global_position
-		
-		# Line segmentleri üzerinde en yakın noktayı bul
-		for i in range(points.size() - 1):
-			var p1 = points[i]
-			var p2 = points[i+1]
-			var close_p = Geometry2D.get_closest_point_to_segment(global_position, p1, p2)
-			var d = global_position.distance_to(close_p)
-			if d < min_dist:
-				min_dist = d
-				best_point = close_p
-		
-		rally_point = best_point
+	# Haritayı ve Yolları Bul
+	# GameScene -> MapHolder -> MapX -> Roads
+	var game_scene = get_tree().current_scene
+	var map_holder = game_scene.get_node_or_null("MapHolder")
 	
-	# Eğer path bulunamazsa, kule önüne biraz offset ver
-	if rally_point == global_position:
-		rally_point += Vector2(0, 50)
+	var best_point = global_position
+	var min_dist = 10000.0
+	var found_road = false
+	
+	if map_holder and map_holder.get_child_count() > 0:
+		var current_map = map_holder.get_child(0)
+		var roads_container = current_map.get_node_or_null("Roads")
+		
+		if roads_container:
+			# Tüm Line2D yolları tara (Çift yol desteği)
+			for road in roads_container.get_children():
+				if road is Line2D:
+					var points = road.points
+					# Line segmentleri üzerinde en yakın noktayı bul
+					for i in range(points.size() - 1):
+						var p1 = road.to_global(points[i]) # Local to Global
+						var p2 = road.to_global(points[i+1])
+						
+						var close_p = Geometry2D.get_closest_point_to_segment(global_position, p1, p2)
+						var d = global_position.distance_to(close_p)
+						
+						if d < min_dist:
+							min_dist = d
+							best_point = close_p
+							found_road = true
+
+	if found_road:
+		rally_point = best_point
+	else:
+		# Fallback: Eski yöntem (Tekil isim arama)
+		var path_line = game_scene.find_child("PathLine", true, false)
+		if path_line and path_line is Line2D:
+			# ... (Eski logic tekrarı gerekmez, zaten yeni sistem çalışmalı)
+			pass
+		
+		# Hiçbir şey bulunamazsa offset ver
+		if rally_point == global_position:
+			rally_point += Vector2(0, 50)
 		
 	# İlk askerleri çıkar
 	_spawn_soldiers()

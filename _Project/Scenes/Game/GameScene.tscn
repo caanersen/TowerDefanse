@@ -71,33 +71,24 @@ horizontal_alignment = 1
 layout_mode = 2
 text = "Menüye Dön"
 
-[node name="BottomPanel" type="PanelContainer" parent="UI"]
-anchors_preset = 12
+[node name="BuildPanel" type="PanelContainer" parent="UI"]
+anchors_preset = 3
+anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -100.0
-grow_horizontal = 2
+offset_left = -300.0
+offset_top = -200.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
 grow_vertical = 0
 
-[node name="HBox" type="HBoxContainer" parent="UI/BottomPanel"]
+[node name="BuildButtons" type="GridContainer" parent="UI/BuildPanel"]
 layout_mode = 2
-theme_override_constants/separation = 20
-alignment = 1
-
-[node name="BuildButtons" type="HBoxContainer" parent="UI/BottomPanel/HBox"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="ArcherBtn" type="Button" parent="UI/BottomPanel/HBox/BuildButtons"]
-custom_minimum_size = Vector2(120, 50)
-layout_mode = 2
-text = "Okçu Kulesi"
-
-[node name="MageBtn" type="Button" parent="UI/BottomPanel/HBox/BuildButtons"]
-custom_minimum_size = Vector2(120, 50)
-layout_mode = 2
-text = "Büyücü Kulesi"
+columns = 3
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
 
 [node name="UpgradePanel" type="PanelContainer" parent="UI"]
 visible = false

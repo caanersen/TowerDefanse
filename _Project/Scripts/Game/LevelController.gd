@@ -68,50 +68,18 @@ func _ready() -> void:
 	if restart_btn: restart_btn.pressed.connect(_on_restart_pressed)
 	
 	# UI Bağlantıları (Sahne ağacından bulup bağla)
-	var ui_btns = get_node_or_null("UI/BottomPanel/HBox/BuildButtons")
+	var ui_btns = get_node_or_null("UI/BuildPanel/BuildButtons")
 	if ui_btns:
-		# Var olanları güncelle
-		var archer_btn = ui_btns.get_node_or_null("ArcherBtn")
-		if archer_btn:
-			archer_btn.text = "Okçu (80g)"
-			if not archer_btn.pressed.is_connected(select_archer):
-				archer_btn.pressed.connect(select_archer)
-		
-		var mage_btn = ui_btns.get_node_or_null("MageBtn")
-		if mage_btn:
-			mage_btn.text = "Büyücü (100g)"
-			if not mage_btn.pressed.is_connected(select_mage):
-				mage_btn.pressed.connect(select_mage)
-		
-		# Mancınık Butonu (Dinamik Ekleme - zaten yoksa ekle)
-		if not ui_btns.has_node("CatapultBtn"):
-			var cat_btn = Button.new()
-			cat_btn.name = "CatapultBtn"
-			cat_btn.text = "Mancınık (200g)"
-			cat_btn.pressed.connect(select_catapult)
-			ui_btns.add_child(cat_btn)
-
-		# Yıldırım Butonu (Dinamik Ekleme)
-		if not ui_btns.has_node("StormBtn"):
-			var storm_btn = Button.new()
-			storm_btn.name = "StormBtn"
-			storm_btn.text = "Yıldırım (180g)"
-			storm_btn.pressed.connect(select_storm)
-			ui_btns.add_child(storm_btn)
-
-		# Kışla Butonu (Dinamik Ekleme)
-		if not ui_btns.has_node("BarracksBtn"):
-			var bar_btn = Button.new()
-			bar_btn.name = "BarracksBtn"
-			bar_btn.text = "Kışla (50g)"
-			bar_btn.pressed.connect(select_barracks)
-			ui_btns.add_child(bar_btn)
-	
-	if upgrade_btn:
-		upgrade_btn.pressed.connect(upgrade_selected_tower)
-		
-	# Play Button Oluştur
-	_create_play_button()
+		# Önce temizle (Scene'den gelenleri veya eski kalanları)
+		for child in ui_btns.get_children():
+			child.queue_free()
+			
+		# Yeni Butonları Oluştur (Ucuzdan Pahalıya)
+		_create_build_btn(ui_btns, "🛡️\n50", select_barracks)
+		_create_build_btn(ui_btns, "🏹\n80", select_archer)
+		_create_build_btn(ui_btns, "🧙\n100", select_mage)
+		_create_build_btn(ui_btns, "⚡\n180", select_storm)
+		_create_build_btn(ui_btns, "☄️\n200", select_catapult)
 
 	# WaveManager sinyalini dinle
 	if wave_manager:
@@ -121,6 +89,25 @@ func _ready() -> void:
 
 	# Haritaya göre valid cells güncelle
 	calculate_valid_cells()
+	
+	# Play ve Upgrade butonlarını hazırla (Sadece 1 kez)
+	_ready_play_and_upgrade()
+
+func _create_build_btn(parent, text, callback) -> void:
+	var btn = Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(80, 80)
+	btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# btn.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP # Godot 4 feature but text multiline works fine
+	btn.pressed.connect(callback)
+	parent.add_child(btn)
+
+func _ready_play_and_upgrade() -> void:
+	if upgrade_btn:
+		upgrade_btn.pressed.connect(upgrade_selected_tower)
+		
+	# Play Button Oluştur
+	_create_play_button()
 
 
 func _create_play_button() -> void:
@@ -429,20 +416,19 @@ func _try_build_tower(pos: Vector2) -> void:
 	# Fare pozisyonuna en yakın GEÇERLİ hex hücresini bul
 	var closest_cell = Vector2.ZERO
 	var min_dist = 10000.0
-	var found_valid = false
 	
 	for cell in valid_ground_cells:
 		var d = pos.distance_to(cell)
 		if d < min_dist:
 			min_dist = d
 			closest_cell = cell
-	
-	# Eğer fare bir hücreye yeterince yakınsa (hex yarıçapı kadar)
-	if min_dist <= hex_radius:
-		found_valid = true
-	else:
-		print("Buraya inşa edilemez!")
+	# Eğer fare bir hücreye yeterince yakınsa
+	# Toleransı artırıyoruz (1.0 -> 1.4) çünkü görsel ile tıklama alanı bazen tam oturmayabilir.
+	if min_dist > hex_radius * 1.4:
+		print("Buraya inşa edilemez! Uzaklık: ", min_dist, " / Limit: ", hex_radius * 1.4)
+		print("Valid Cells Count: ", valid_ground_cells.size())
 		return
+
 
 	var snapped_pos = closest_cell
 
