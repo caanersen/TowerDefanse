@@ -11,7 +11,7 @@ loop = false
 script = ExtResource("1_script")
 speed = 30.0
 max_health = 800
-gold_reward = 10
+gold_reward = 20
 
 [node name="Sprite" type="ColorRect" parent="."]
 offset_left = -24.0

@@ -1,5 +1,5 @@
 extends PathFollow2D
-class_name BaseEnemy
+# class_name BaseEnemy # Commented out to fix conflict
 
 signal died(enemy)
 signal reached_base(enemy)
@@ -7,17 +7,67 @@ signal reached_base(enemy)
 @export var speed: float = 100.0
 @export var max_health: int = 30
 @export var gold_reward: int = 10
+@export var physical_armor: int = 0
+@export var is_flying: bool = false
 @onready var current_health: int = max_health
 
 # Görsel referansı (tilenmesi için placeholder renk değişimi)
 @onready var sprite: ColorRect = $Sprite
 
 func _ready() -> void:
+	add_to_group("enemies")
 	loop = false # Tek sefer git
 	rotates = false # İsteğe bağlı
 	_setup_particles()
+	_setup_health_bar()
+
+var health_bg: ColorRect
+var health_fill: ColorRect
+
+func _setup_health_bar() -> void:
+	# Arkaplan (Siyah)
+	health_bg = ColorRect.new()
+	health_bg.color = Color(0, 0, 0, 0.5)
+	health_bg.size = Vector2(40, 4) # 4px yükseklik (2px fill + kenar için)
+	health_bg.position = Vector2(-20, 25)
+	health_bg.z_index = 10 
+	add_child(health_bg)
+	
+	# Dolum (Yeşil) - Tam 2px olacak şekilde
+	health_fill = ColorRect.new()
+	health_fill.color = Color(0, 1, 0)
+	health_fill.size = Vector2(40, 2) # İstenilen 2px
+	health_fill.position = Vector2(0, 1) # Bg içinde ortala
+	health_bg.add_child(health_fill)
+	
+	_update_health_bar()
+
+func _update_health_bar() -> void:
+	if health_fill and max_health > 0:
+		var ratio = float(current_health) / float(max_health)
+		# Genişliği orana göre ayarla
+		health_fill.size.x = 40.0 * ratio
+
+var is_blocked: bool = false
+var blocker_unit: Node2D = null # Asker referansı
+var attack_damage: int = 5
+var attack_timer: float = 0.0
+var attack_interval: float = 1.0
 
 func _physics_process(delta: float) -> void:
+	# Eğer bloklanmışsa ilerleme ve SALDIR!
+	if is_blocked:
+		if not is_instance_valid(blocker_unit):
+			disengage() # Asker öldüyse serbest kal
+		else:
+			# Dövüş
+			attack_timer -= delta
+			if attack_timer <= 0.0:
+				attack_timer = attack_interval
+				if blocker_unit.has_method("take_damage"):
+					blocker_unit.take_damage(attack_damage)
+		return
+
 	progress += speed * delta
 	_handle_status_effects(delta)
 	
@@ -35,10 +85,24 @@ func _on_reach_base() -> void:
 	emit_signal("reached_base", self) # Sinyali yay
 	queue_free()
 
-func take_damage(amount: int) -> void:
-	current_health -= amount
-	show_floating_text("-" + str(amount), Color.WHITE) # Hasar yazısı
-	print(name, " took ", amount, " damage. HP: ", current_health)
+func take_damage(amount: int, damage_type: String = "PHYSICAL") -> void:
+	var actual_damage = amount
+	
+	if damage_type == "PHYSICAL":
+		# Apply armor reduction
+		actual_damage = max(1, amount - physical_armor)
+	
+	# MAGIC hasar zırhı yok sayar (direkt amount)
+	
+	current_health -= actual_damage
+	_update_health_bar()
+	
+	var color = Color.WHITE
+	if damage_type == "MAGIC":
+		color = Color.CYAN # Büyü hasarı mavi
+	
+	show_floating_text("-" + str(actual_damage), color)
+	print(name, " took ", actual_damage, " ", damage_type, " damage. HP: ", current_health)
 	
 	if current_health <= 0:
 		die()
@@ -164,10 +228,22 @@ func _handle_status_effects(delta: float) -> void:
 		burn_tick_timer += delta
 		if burn_tick_timer >= 1.0: # Her saniye
 			burn_tick_timer = 0.0
-			take_damage(burn_damage_per_tick)
+			take_damage(burn_damage_per_tick, "MAGIC")
 			
 		if burn_timer <= 0:
 			is_burning = false
 			if sprite and not is_slowed: # Slow yoksa rengi düzelt
 				sprite.modulate = Color(1, 1, 1)
 			if fire_particles: fire_particles.emitting = false
+
+func engage(unit: Node2D) -> void:
+	if is_flying:
+		return
+	is_blocked = true
+	blocker_unit = unit
+	# Animasyon varsa burada saldırı animasyonuna geçilir
+
+func disengage() -> void:
+	is_blocked = false
+	blocker_unit = null
+	# Yürümeye devam

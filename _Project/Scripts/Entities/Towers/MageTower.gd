@@ -1,12 +1,13 @@
 extends "res://_Project/Scripts/Entities/BaseTower.gd"
 
-class_name MageTower
+# class_name MageTower # Commented out to fix conflict
 
 # 0: None, 1: Ice, 2: Fire
 var element_type: int = 0 
 
 func _ready():
 	super._ready()
+	damage = 25 # Arttırılmış hasar
 	max_level = 3 # Zaten base 3 ama emin olalım
 
 func get_upgrade_cost() -> int:
@@ -60,11 +61,11 @@ func _find_new_target() -> void:
 		return
 		
 	# 1. Öncelik: Etkilenmemiş en öndeki düşman
-	var best_clean_target: BaseEnemy = null
+	var best_clean_target: Node2D = null
 	var max_clean_progress: float = -1.0
 	
 	# 2. Öncelik: Hepsi etkilenmişse en öndeki herhangi biri
-	var best_any_target: BaseEnemy = null
+	var best_any_target: Node2D = null
 	var max_any_progress: float = -1.0
 	
 	for enemy in enemies_in_range:
@@ -119,6 +120,7 @@ func _attack() -> void:
 		proj.global_position = global_position
 		
 		proj.initialize(target, damage)
+		proj.damage_type = "MAGIC"
 		
 		# Element efektlerini aktar
 		if element_type == 1: # ICE

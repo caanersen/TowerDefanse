@@ -1,4 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://ca8eunqc3nqu7"]
+[gd_scene load_steps=3 format=3 uid="uid://ca8eunqc3nqu7"]
+
+[ext_resource type="PackedScene" path="res://_Project/Scenes/Entities/ConstructionSite.tscn" id="2_site"]
 
 [sub_resource type="Curve2D" id="Curve2D_path"]
 _data = {
@@ -6,7 +8,7 @@ _data = {
 }
 point_count = 4
 
-[node name="Map" type="Node2D"]
+[node name="Map2" type="Node2D"]
 
 [node name="PathLine" type="Line2D" parent="."]
 points = PackedVector2Array(112, 240, 560, 240, 560, 432, 944, 432)
@@ -22,3 +24,113 @@ offset_top = 368.0
 offset_right = 1008.0
 offset_bottom = 496.0
 color = Color(0.6, 0.2, 0.8, 1)
+
+[node name="TowerSpots" type="Node2D" parent="."]
+
+[node name="ConstructionSite1" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(629, 183)
+
+[node name="ConstructionSite2" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(487, 309)
+
+[node name="ConstructionSite3" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(386, 171)
+
+[node name="ConstructionSite4" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(435, 171)
+
+[node name="ConstructionSite5" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(484, 171)
+
+[node name="ConstructionSite6" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(533, 171)
+
+[node name="ConstructionSite7" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(582, 171)
+
+[node name="ConstructionSite9" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(190, 171)
+
+[node name="ConstructionSite10" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(239, 171)
+
+[node name="ConstructionSite11" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(288, 171)
+
+[node name="ConstructionSite12" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(337, 171)
+
+[node name="ConstructionSite8" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(291, 309)
+
+[node name="ConstructionSite13" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(340, 309)
+
+[node name="ConstructionSite14" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(389, 309)
+
+[node name="ConstructionSite15" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(438, 309)
+
+[node name="ConstructionSite18" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(193, 309)
+
+[node name="ConstructionSite19" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(242, 309)
+
+[node name="ConstructionSite16" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(682, 363)
+
+[node name="ConstructionSite17" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(633, 230)
+
+[node name="ConstructionSite20" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(633, 272)
+
+[node name="ConstructionSite21" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(633, 314)
+
+[node name="ConstructionSite22" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(633, 363)
+
+[node name="ConstructionSite23" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(780, 363)
+
+[node name="ConstructionSite24" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(731, 363)
+
+[node name="ConstructionSite26" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(829, 363)
+
+[node name="ConstructionSite25" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(487, 351)
+
+[node name="ConstructionSite27" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(487, 393)
+
+[node name="ConstructionSite28" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(487, 435)
+
+[node name="ConstructionSite29" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(522, 501)
+
+[node name="ConstructionSite30" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(487, 477)
+
+[node name="ConstructionSite31" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(620, 501)
+
+[node name="ConstructionSite32" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(571, 501)
+
+[node name="ConstructionSite33" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(669, 501)
+
+[node name="ConstructionSite34" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(718, 501)
+
+[node name="ConstructionSite35" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(816, 501)
+
+[node name="ConstructionSite36" parent="TowerSpots" instance=ExtResource("2_site")]
+position = Vector2(767, 501)

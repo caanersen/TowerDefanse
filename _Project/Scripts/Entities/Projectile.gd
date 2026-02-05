@@ -1,7 +1,7 @@
 extends Area2D
-class_name Projectile
+# class_name Projectile
 
-var target: BaseEnemy = null
+var target: Node2D = null
 var damage: int = 10
 var speed: float = 400.0
 
@@ -10,8 +10,9 @@ var is_headshot: bool = false
 var effect_type: int = 0 # 0: None, 1: Slow, 2: Burn
 var effect_duration: float = 0.0
 var effect_value: float = 0.0
+var damage_type: String = "PHYSICAL"
 
-func initialize(_target: BaseEnemy, _damage: int) -> void:
+func initialize(_target: Node2D, _damage: int) -> void:
 	target = _target
 	damage = _damage
 	# Hedefe dön
@@ -35,11 +36,11 @@ func _physics_process(delta: float) -> void:
 func _hit_target() -> void:
 	if target and is_instance_valid(target):
 		if is_headshot:
-			target.take_damage(99999) # Tek Atış
+			target.take_damage(99999, "PHYSICAL") # Tek Atış
 			if target.has_method("show_floating_text"):
 				target.show_floating_text("HEADSHOT!", Color.YELLOW) # Sarı (Daha belirgin)
 		else:
-			target.take_damage(damage)
+			target.take_damage(damage, damage_type)
 			
 		# Efekt Uygula
 		if effect_type == 1: # SLOW

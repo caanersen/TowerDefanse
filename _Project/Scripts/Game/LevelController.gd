@@ -2,12 +2,15 @@ extends Node2D
 
 @export var archer_tower_scene: PackedScene
 @export var mage_tower_scene: PackedScene
+@export var catapult_tower_scene: PackedScene
+@export var storm_tower_scene: PackedScene
+@export var barracks_tower_scene: PackedScene
 @export var towers_container: Node2D
 
 var selected_tower_type: int = 0 # 0: None, 1: Archer, 2: Mage
 var valid_ground_cells: Array[Vector2] = []
-var current_gold: int = 2000 # Başlangıç parası (Test için artırıldı)
-var selected_tower: BaseTower = null
+var current_gold: int = 450 # Başlangıç parası dengelendi (2000 -> 450)
+var selected_tower: Node2D = null # Type hint removed due to class_name conflict
 # Upgrade Panel artık UI root altında
 @onready var upgrade_panel: Control = get_node("UI/UpgradePanel")
 @onready var upgrade_btn: Button = get_node("UI/UpgradePanel/UpgradeBtn")
@@ -20,18 +23,43 @@ var selected_tower: BaseTower = null
 @onready var wave_manager: Node = get_node("WaveManager")
 @onready var game_over_panel: Control = get_node("UI/GameOverPanel")
 @onready var restart_btn: Button = get_node("UI/GameOverPanel/VBox/RestartBtn")
+@onready var play_btn: Button # Kod ile oluşturacağız
 
 var base_health: int = 20
+var is_game_started: bool = false
+var is_game_paused: bool = false # Pause state
 
 # MapHolder referansı
 @onready var map_holder: Node = get_node("MapHolder")
 
 # Dinamik yüklenen harita referansı
 var current_map_instance: Node = null
+var tower_spots_node: Node2D = null
+
+# HEX GRID AYARLARI (FLAT TOPPED)
+# Flat Top: Köşeler 0, 60, 120... (Sağ/Sol köşeli, Üst/Alt düz)
+# Horizontal yollarla daha iyi hizalanır.
+var hex_radius: float = 24.0
+var hex_height: float = sqrt(3) * hex_radius # Dikey yükseklik (Flat to Flat)
+var hex_width: float = 2 * hex_radius # Yatay genişlik (Point to Point)
+
+# Boşluklar (Flat Topped için Staggered Columns)
+# X ekseninde her hex 3/4 genişlik kaplar (iç içe geçme)
+var hex_horiz_spacing: float = hex_width * 0.75 
+# Y ekseninde tam yükseklik
+var hex_vert_spacing: float = hex_height
 
 func _ready() -> void:
 	# 1. Haritayı Yükle
 	_load_current_map()
+	
+	# Load Scenes...
+	if catapult_tower_scene == null:
+		catapult_tower_scene = load("res://_Project/Scenes/Entities/Towers/CatapultTower.tscn")
+	if storm_tower_scene == null:
+		storm_tower_scene = load("res://_Project/Scenes/Entities/Towers/StormTower.tscn")
+	if barracks_tower_scene == null:
+		barracks_tower_scene = load("res://_Project/Scenes/Entities/Towers/BarracksTower.tscn")
 	
 	update_gold_ui()
 	update_health_ui()
@@ -39,21 +67,101 @@ func _ready() -> void:
 	if game_over_panel: game_over_panel.visible = false
 	if restart_btn: restart_btn.pressed.connect(_on_restart_pressed)
 	
+	# UI Bağlantıları (Sahne ağacından bulup bağla)
+	var ui_btns = get_node_or_null("UI/BottomPanel/HBox/BuildButtons")
+	if ui_btns:
+		# Var olanları güncelle
+		var archer_btn = ui_btns.get_node_or_null("ArcherBtn")
+		if archer_btn:
+			archer_btn.text = "Okçu (80g)"
+			if not archer_btn.pressed.is_connected(select_archer):
+				archer_btn.pressed.connect(select_archer)
+		
+		var mage_btn = ui_btns.get_node_or_null("MageBtn")
+		if mage_btn:
+			mage_btn.text = "Büyücü (100g)"
+			if not mage_btn.pressed.is_connected(select_mage):
+				mage_btn.pressed.connect(select_mage)
+		
+		# Mancınık Butonu (Dinamik Ekleme - zaten yoksa ekle)
+		if not ui_btns.has_node("CatapultBtn"):
+			var cat_btn = Button.new()
+			cat_btn.name = "CatapultBtn"
+			cat_btn.text = "Mancınık (200g)"
+			cat_btn.pressed.connect(select_catapult)
+			ui_btns.add_child(cat_btn)
+
+		# Yıldırım Butonu (Dinamik Ekleme)
+		if not ui_btns.has_node("StormBtn"):
+			var storm_btn = Button.new()
+			storm_btn.name = "StormBtn"
+			storm_btn.text = "Yıldırım (180g)"
+			storm_btn.pressed.connect(select_storm)
+			ui_btns.add_child(storm_btn)
+
+		# Kışla Butonu (Dinamik Ekleme)
+		if not ui_btns.has_node("BarracksBtn"):
+			var bar_btn = Button.new()
+			bar_btn.name = "BarracksBtn"
+			bar_btn.text = "Kışla (50g)"
+			bar_btn.pressed.connect(select_barracks)
+			ui_btns.add_child(bar_btn)
+	
+	if upgrade_btn:
+		upgrade_btn.pressed.connect(upgrade_selected_tower)
+		
+	# Play Button Oluştur
+	_create_play_button()
+
 	# WaveManager sinyalini dinle
 	if wave_manager:
 		wave_manager.on_enemy_reward.connect(add_gold)
 		if wave_manager.has_signal("wave_started"):
 			wave_manager.wave_started.connect(_on_wave_started)
 
-	# UI Bağlantıları (Sahne ağacından bulup bağla)
-	var ui_btns = get_node("UI/BottomPanel/HBox/BuildButtons")
-	if ui_btns:
-		ui_btns.get_node("ArcherBtn").pressed.connect(select_archer)
-		ui_btns.get_node("MageBtn").pressed.connect(select_mage)
-	
-	if upgrade_btn:
-		upgrade_btn.pressed.connect(upgrade_selected_tower)
+	# Haritaya göre valid cells güncelle
+	calculate_valid_cells()
+
+
+func _create_play_button() -> void:
+	# UI/HBoxInfo içine ekleyelim
+	var hbox = get_node_or_null("UI/HBoxInfo")
+	if hbox:
+		play_btn = Button.new()
+		play_btn.text = " > " # Simple text arrow
+		play_btn.custom_minimum_size = Vector2(50, 40)
+		play_btn.process_mode = Node.PROCESS_MODE_ALWAYS # PAUSE modunda çalışması için ÖNEMLİ!
 		
+		# Renk Ayarları (Siyah Beyaz)
+		play_btn.add_theme_color_override("font_color", Color.WHITE)
+		play_btn.add_theme_color_override("font_hover_color", Color.LIGHT_GRAY)
+		play_btn.add_theme_color_override("font_pressed_color", Color.GRAY)
+		
+		# Butonun kendisini siyahımsı yapalım
+		play_btn.modulate = Color(1, 1, 1) 
+		
+		play_btn.pressed.connect(_on_play_pause_pressed)
+		hbox.add_child(play_btn)
+
+func _on_play_pause_pressed() -> void:
+	if not is_game_started:
+		# İlk Başlangıç
+		is_game_started = true
+		play_btn.text = "||" # Text pause
+		if wave_manager and wave_manager.has_method("start_next_wave"):
+			wave_manager.start_next_wave()
+	else:
+		# Pause / Resume
+		is_game_paused = !is_game_paused
+		get_tree().paused = is_game_paused
+		
+		if is_game_paused:
+			play_btn.text = " > "
+		else:
+			play_btn.text = "||"
+
+
+	
 	# Upgrade Panel'in kendisi tıklamaları engellemesin (arkadaki kuleye tıklanabilsin)
 	if upgrade_panel:
 		upgrade_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -76,13 +184,21 @@ func _load_current_map() -> void:
 		calculate_valid_cells()
 		
 		# WaveManager'a Path2D'yi ver
-		if wave_manager and current_map_instance.has_node("Path2D"):
-			var path_node = current_map_instance.get_node("Path2D")
+		if wave_manager:
+			var found_paths = []
+			# Tüm child node'ları tara
+			for child in current_map_instance.get_children():
+				if child is Path2D:
+					found_paths.append(child)
+			
+			# Fallback for old map structure (if named specifically "Path2D")
+			if found_paths.is_empty() and current_map_instance.has_node("Path2D"):
+				found_paths.append(current_map_instance.get_node("Path2D"))
+			
 			if wave_manager.has_method("initialize"):
-				wave_manager.initialize(path_node)
-				# Otomatik başlatma WaveManager içinde değilse buradan tetiklenebilir
-			if wave_manager.has_method("start_next_wave"):
-				wave_manager.start_next_wave()
+				wave_manager.initialize(found_paths)
+				# Otomatik başlatma ARTIK Play butonu ile yapılıyor
+				# wave_manager.start_next_wave() satırı kaldırıldı.
 	else:
 		print("Map file not found: ", map_path)
 
@@ -114,6 +230,10 @@ func _on_restart_pressed() -> void:
 	get_tree().reload_current_scene()
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Eğer oyun başladıysa VE duraklatıldıysa işlem yapma (Ancak oyun başlamadıysa işlem yap, serbest mod)
+	if is_game_started and is_game_paused: return 
+	
+	
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if selected_tower_type != 0:
 			_try_build_tower(get_global_mouse_position())
@@ -150,17 +270,9 @@ func _try_select_tower(pos: Vector2) -> void:
 func _update_ui() -> void:
 	update_gold_ui()
 	
-	# Dinamik butonları temizle (Varsa)
-	var dynamic_container = upgrade_panel.get_node_or_null("DynamicButtons")
-	if dynamic_container:
-		# Konteyneri komple temizle ve sil
-		for child in dynamic_container.get_children():
-			child.queue_free()
-		# Konteynerin kendisini de kaldırabiliriz ama 
-		# parent'a ekli kalması input block yaratabilir mi? 
-		# Emin olmak için görünmez yapalım veya silelim.
-		dynamic_container.queue_free()
-		dynamic_container = null # Referansı sıfırla
+	# Dinamik butonları temizle (Varsa) - Cleanup handled below within creation logic
+	var dynamic_container = null
+
 	
 	if selected_tower:
 		upgrade_panel.visible = true
@@ -169,67 +281,107 @@ func _update_ui() -> void:
 		var screen_pos = selected_tower.get_global_transform_with_canvas().origin
 		upgrade_panel.position = screen_pos + Vector2(-75, -80)
 		
-		# MAGE BRANCHING CHECK
-		if selected_tower is MageTower and selected_tower.level == 2:
-			upgrade_btn.visible = false # Standart butonu gizle
-			
-			# Container oluştur
+		# Container oluştur (Upgrade + Sell butonları için)
+		# Container (Upgrade + Sell butonları için) - Logic moved up
+
+		# UpgradeBtn'nin parent'ına (VBox muhtemelen) ekle.
+		upgrade_btn.visible = false # Orijinal butonu gizle (yerine dynamic container içinde yenisini oluşturacağız)
+		
+		# Eğer zaten varsa kullan, yoksa oluştur
+		if upgrade_btn.get_parent().has_node("DynamicButtons"):
+			dynamic_container = upgrade_btn.get_parent().get_node("DynamicButtons")
+			# İçini temizle
+			for child in dynamic_container.get_children():
+				child.queue_free()
+		else:
 			dynamic_container = HBoxContainer.new()
 			dynamic_container.name = "DynamicButtons"
 			dynamic_container.alignment = BoxContainer.ALIGNMENT_CENTER
 			upgrade_btn.get_parent().add_child(dynamic_container)
-			# Butonun hemen altında veya yerinde çıksın diye pozisyonlama yapılabilir
-			# Şimdilik VBox/HBox düzenine güveniyoruz
+			upgrade_btn.get_parent().move_child(dynamic_container, upgrade_btn.get_index() + 1)
+		
+		# SELL BUTTON (Her zaman göster)
+		var sell_btn = Button.new()
+		var refund = selected_tower.get_sell_refund()
+		sell_btn.text = "$ (" + str(refund) + ")" # 'g' harfini kaldırdım, daha temiz
+		sell_btn.modulate = Color(1, 0.4, 0.4) # Biraz daha canlı kırmızı
+		sell_btn.add_theme_font_size_override("font_size", 18) # Daha büyük font
+		# Kalınlık için tema fontu yoksa, büyük font yeterli olacaktır.
+		
+		sell_btn.pressed.connect(sell_selected_tower)
+		dynamic_container.add_child(sell_btn)
+		
+		# MAGE BRANCHING CHECK
+		# Use script check instead of global class check due to conflicts
+		# var mage_script = load("res://_Project/Scripts/Entities/Towers/MageTower.gd")
+		# Or check for unique properties like 'element_type'
+		if "element_type" in selected_tower and selected_tower.level == 2:
+			upgrade_btn.visible = false # Standart butonu gizle
 			
 			# ICE BUTTON
 			var ice_btn = Button.new()
-			ice_btn.text = "Buz (300g)"
+			ice_btn.text = "❄️ (300)"
 			ice_btn.pressed.connect(_on_choose_ice)
 			dynamic_container.add_child(ice_btn)
 			
 			# FIRE BUTTON
 			var fire_btn = Button.new()
-			fire_btn.text = "Ateş (300g)"
+			fire_btn.text = "🔥 (300)"
 			fire_btn.pressed.connect(_on_choose_fire)
 			dynamic_container.add_child(fire_btn)
 			
-			# Para Yeterli mi?
 			if current_gold < 300:
 				ice_btn.disabled = true
-				ice_btn.text = "Buz (300g) - Yetersiz"
 				fire_btn.disabled = true
-				fire_btn.text = "Ateş (300g) - Yetersiz"
 			
 		else:
-			# STANDART UPGRADE
-			upgrade_btn.visible = true
-			
+			# STANDART UPGRADE (Yeni buton oluştur)
+			var new_upgrade_btn = Button.new()
 			var cost = get_upgrade_cost(selected_tower)
-			upgrade_btn.text = "Yükselt (" + str(cost) + "g)"
+			new_upgrade_btn.text = "⬆ (" + str(cost) + ")" # Kalın ok
+			new_upgrade_btn.add_theme_font_size_override("font_size", 18) # Daha büyük font
+			new_upgrade_btn.pressed.connect(upgrade_selected_tower)
+			dynamic_container.add_child(new_upgrade_btn)
 			
 			if selected_tower.level >= selected_tower.max_level:
-				upgrade_btn.text = "Maksimum Seviye"
-				upgrade_btn.disabled = true
+				new_upgrade_btn.text = "MAX"
+				new_upgrade_btn.disabled = true
 			elif current_gold < cost:
-				upgrade_btn.disabled = true
-				upgrade_btn.text = "Yükselt (" + str(cost) + "g) - Yetersiz Altın"
+				new_upgrade_btn.disabled = true
 			else:
-				upgrade_btn.disabled = false
+				new_upgrade_btn.disabled = false
 	else:
 		upgrade_panel.visible = false
 
+# ... (Ice/Fire handlers)
+
+func sell_selected_tower() -> void:
+	if selected_tower:
+		var refund = selected_tower.get_sell_refund()
+		add_gold(refund)
+		print("Sold tower for ", refund, " gold.")
+		
+		# Kuleyi sil
+		selected_tower.queue_free()
+		selected_tower = null
+		_update_ui()
+		call_deferred("update_construction_site_visibility")
+
 func _on_choose_ice() -> void:
-	if selected_tower and selected_tower is MageTower:
+	# Check for "element_type" property for MageTower
+	if selected_tower and "element_type" in selected_tower:
 		if current_gold >= 300:
 			current_gold -= 300
+			selected_tower.total_cost += 300 # Maliyet güncelle
 			selected_tower.choose_element(1) # ICE
 			_update_ui()
 			print("Upgraded to ICE MAGE")
 
 func _on_choose_fire() -> void:
-	if selected_tower and selected_tower is MageTower:
+	if selected_tower and "element_type" in selected_tower:
 		if current_gold >= 300:
 			current_gold -= 300
+			selected_tower.total_cost += 300 # Maliyet güncelle
 			selected_tower.choose_element(2) # FIRE
 			_update_ui()
 			print("Upgraded to FIRE MAGE")
@@ -244,6 +396,7 @@ func upgrade_selected_tower() -> void:
 		var cost = get_upgrade_cost(selected_tower)
 		if current_gold >= cost:
 			current_gold -= cost
+			selected_tower.total_cost += cost # Maliyet güncelle
 			selected_tower.upgrade()
 			_update_ui()
 			print("Upgraded for ", cost, " gold.")
@@ -261,58 +414,79 @@ func update_gold_ui() -> void:
 func _try_build_tower(pos: Vector2) -> void:
 	# Maliyet Kontrolü
 	var cost = 0
-	if selected_tower_type == 1: cost = 50 # Archer
+	if selected_tower_type == 1: cost = 80 # Archer
 	elif selected_tower_type == 2: cost = 100 # Mage
+	elif selected_tower_type == 3: cost = 200 # Catapult
+	elif selected_tower_type == 4: cost = 180 # Storm
+	elif selected_tower_type == 5: cost = 50 # Barracks
 	
 	if current_gold < cost:
 		print("Not enough gold! Need: ", cost)
 		selected_tower_type = 0 # iptal
 		return
 	
-	# Grid'e hizala (32x32)
-	# Hizalamayı farenin bulunduğu karenin merkezine yapmak için offset ekleyelim ve floorlayalım
-	var grid_size = 32
-	var local_pos = towers_container.to_local(pos) # Container'a göre yerel kooordinat
-	var grid_pos = (local_pos / grid_size).floor()
-	var snapped_pos = (grid_pos * grid_size) + Vector2(grid_size/2.0, grid_size/2.0) # Merkeze al
+	# Grid'e hizala (Hex Snapping)
+	# Fare pozisyonuna en yakın GEÇERLİ hex hücresini bul
+	var closest_cell = Vector2.ZERO
+	var min_dist = 10000.0
+	var found_valid = false
+	
+	for cell in valid_ground_cells:
+		var d = pos.distance_to(cell)
+		if d < min_dist:
+			min_dist = d
+			closest_cell = cell
+	
+	# Eğer fare bir hücreye yeterince yakınsa (hex yarıçapı kadar)
+	if min_dist <= hex_radius:
+		found_valid = true
+	else:
+		print("Buraya inşa edilemez!")
+		return
 
-	# Basit geçerlilik kontrolü: Zaten kule var mı? (Container local koordinatta çalışıyor)
-	# Dikkat: pos global, tower.position local (towers_container child'ı)
-	# KURAL: Kuleler arasında 1 grid (32px) boşluk olmalı.
-	# İki kule merkezi arası mesafe en az 64px olmalı (32+32).
+	var snapped_pos = closest_cell
+
+	# Basit geçerlilik kontrolü: Zaten kule var mı?
+	# "Yanındaki kareye inşaat yapılamasın" kuralı için mesafeyi artırıyoruz.
+	# Komşu hex merkezleri arası mesafe yaklaşık 41-48px (Radius 24 iken).
+	# 1.5 * 24 = 36 idi (İzin veriyordu).
+	# 2.2 * 24 = 52.8 (Komşuyu engeller).
 	for tower in towers_container.get_children():
-		if tower.position.distance_to(snapped_pos) < 64.0:
-			print("Kuleler çok yakın! Arada boşluk bırakmalısın.")
+		if tower.position.distance_to(snapped_pos) < hex_radius * 2.2:
+			print("Kuleler çok yakın! Bitişik alana inşaat yapılamaz.")
 			return
 
-	# ZEMİN KONTROLÜ (Helper fonksiyona devrettik)
-	if not is_valid_ground(snapped_pos):
-		print("Geçersiz zemin!")
-		return
+	# ZEMİN KONTROLÜ (Zaten valid listesinden seçtik ama yine de double check)
+	# if not is_valid_hex_ground(snapped_pos): return
 	
 	var tower_instance
 	if selected_tower_type == 1:
 		tower_instance = archer_tower_scene.instantiate()
 	elif selected_tower_type == 2:
 		tower_instance = mage_tower_scene.instantiate()
+	elif selected_tower_type == 3:
+		tower_instance = catapult_tower_scene.instantiate()
+	elif selected_tower_type == 4:
+		tower_instance = storm_tower_scene.instantiate()
+	elif selected_tower_type == 5:
+		tower_instance = barracks_tower_scene.instantiate()
 	
 	if tower_instance:
 		current_gold -= cost 
 		update_gold_ui()
 		
 		tower_instance.position = snapped_pos
+		tower_instance.total_cost = cost # Başlangıç maliyetini kaydet
 		towers_container.add_child(tower_instance)
 		print("Tower built at ", snapped_pos)
 		
 		selected_tower_type = 0 
 		
-		if selected_tower: selected_tower.set_selected(false) 
 		selected_tower = tower_instance
 		selected_tower.set_selected(true)
 		_update_ui()
 		
-		# İnşa sonrası durum değiştiği için tekrar çizdir (eğer anlık güncelleme lazımsa)
-		queue_redraw()
+		update_construction_site_visibility()
 
 func select_archer() -> void:
 	selected_tower_type = 1
@@ -326,122 +500,82 @@ func select_mage() -> void:
 	_update_ui()
 	print("Mage selected")
 
+func select_catapult() -> void:
+	selected_tower_type = 3 # 3: Catapult
+	selected_tower = null
+	_update_ui()
+	print("Catapult selected")
+
+func select_storm() -> void:
+	selected_tower_type = 4 # 4: Storm
+	selected_tower = null
+	_update_ui()
+	print("Storm selected")
+
+func select_barracks() -> void:
+	selected_tower_type = 5 # 5: Barracks
+	selected_tower = null
+	_update_ui()
+	print("Barracks selected")
+
 func _process(_delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	# İnşa edilebilir alanları çiz (Açık Sarı Kareler)
-	var grid_size = 32
-	var rect_size = Vector2(grid_size - 2, grid_size - 2) # Biraz küçült (padding)
-	
-	for cell_pos in valid_ground_cells:
-		
-		# Kule engeli kontrolü (Visual sadece)
-		var is_blocked = false
-		for tower in towers_container.get_children():
-			if not tower is BaseTower: continue
-			if tower.position.distance_to(cell_pos) < 64.0:
-				is_blocked = true
-				break
-		
-		if not is_blocked:
-			var top_left = cell_pos - rect_size / 2.0
-			draw_rect(Rect2(top_left, rect_size), Color(1, 1, 0, 0.2)) # Açık sarı şeffaf
+	# Manuel yerleşimde (ConstructionSite) görsel zaten var.
+	# Buradaki çizimi sadece "Visual Debug" veya "Highlight" için tutabiliriz.
+	# Fakat kullanıcı "senin kod ile yazdıklarını kaldır" dediği için burada 
+	# base görseli kapatıyoruz.
+	pass
+	# NOT: Eğer oyun içinde hover efekti vs istersen burayı açabilirsin.
+
+func _get_hex_corners(center: Vector2) -> PackedVector2Array:
+	var corners = PackedVector2Array()
+	# FLAT TOPPED: 0, 60, 120, 180, 240, 300
+	for i in range(6):
+		var angle_deg = 60 * i 
+		var angle_rad = deg_to_rad(angle_deg)
+		var px = center.x + hex_radius * cos(angle_rad)
+		var py = center.y + hex_radius * sin(angle_rad)
+		corners.append(Vector2(px, py))
+	return corners
 
 func calculate_valid_cells() -> void:
 	valid_ground_cells.clear()
 	if not current_map_instance: return
-	var path_line = current_map_instance.get_node_or_null("PathLine")
-	if not path_line: return
 	
-	# Harita sınırlarını bul
-	var points = path_line.points
-	if points.size() == 0: return
+	# MANUEL YERLEŞİM MODU
+	# Procedural kod yerine, haritadaki "TowerSpots" node'larını kullan.
 	
-	var min_x = 10000.0
-	var max_x = -10000.0
-	var min_y = 10000.0
-	var max_y = -10000.0
+	var spots_container = current_map_instance.get_node_or_null("TowerSpots")
+	if spots_container:
+		tower_spots_node = spots_container
+		for child in spots_container.get_children():
+			# Child'ın global pozisyonunu kaydet
+			# Bu sayede _try_build_tower bu noktalara snap edebilecek.
+			valid_ground_cells.append(child.global_position)
+	else:
+		# Fallback: Eski haritalar için veya node bulunamazsa
+		# (İsteğe bağlı eski koda dönebiliriz ama şimdilik manuel moddayız)
+		print("TowerSpots node not found in map.")
 	
-	for p in points:
-		min_x = min(min_x, p.x)
-		max_x = max(max_x, p.x)
-		min_y = min(min_y, p.y)
-		max_y = max(max_y, p.y)
-	
-	# Biraz marj ekle
-	var margin = 200
-	min_x -= margin
-	max_x += margin
-	min_y -= margin
-	max_y += margin
-	
-	var grid_size = 32
-	var x = min_x
-	while x <= max_x:
-		var y = min_y
-		while y <= max_y:
-			# Grid merkezini bul
-			var grid_pos = (Vector2(x, y) / grid_size).floor()
-			var center_pos = (grid_pos * grid_size) + Vector2(grid_size/2.0, grid_size/2.0)
-			
-			if is_valid_ground(center_pos):
-				valid_ground_cells.append(center_pos)
-			
-			y += grid_size
-		x += grid_size
+	update_construction_site_visibility()
 	
 	queue_redraw()
 
-func is_valid_ground(pos: Vector2) -> bool:
-	# YOL KONTROLÜ
-	# Red Zone (Başlangıç ve Bitiş) Kontrolü
-	if pos.x < 160 or pos.x > 840:
-		return false
+func update_construction_site_visibility() -> void:
+	if not tower_spots_node: return
+	
+	for site in tower_spots_node.get_children():
+		var is_blocked = false
+		for tower in towers_container.get_children():
+			if tower.is_queued_for_deletion(): continue
+			
+			if tower.global_position.distance_to(site.global_position) < hex_radius * 2.2:
+				is_blocked = true
+				break
+		
+		site.visible = !is_blocked
 
-	var path_line = null
-	if current_map_instance:
-		path_line = current_map_instance.get_node_or_null("PathLine")
-		
-	if path_line:
-		var points = path_line.points
-		var path_half_width = path_line.width / 2.0
-		var tower_radius = 15.0 # 16 yerine 15 yaparak 64px mesafede temasa izin veriyoruz
-		var margin = 0.1
-		var min_safe_dist = path_half_width + tower_radius + margin
-		var max_build_dist = min_safe_dist + 15.0 # Arka sıraları iptal et (Sadece ilk sıra)
-		
-		# Kural:
-		# 1. En az bir segmentin "max_build_dist" menzilinde olmalı (Yola yakın olmalı)
-		# 2. Hiçbir segmentin "min_safe_dist" menzilinde OLMAMALI (Yolun üstünde olmamalı)
-		
-		var within_build_zone = false
-		var on_the_path = false
-		
-		for i in range(points.size() - 1):
-			var p1 = points[i]
-			var p2 = points[i+1]
-			
-			var closest_point = Geometry2D.get_closest_point_to_segment(pos, p1, p2)
-			var dist = pos.distance_to(closest_point)
-			
-			# AABB Kontrolü
-			var safe_zone_aabb = min_safe_dist
-			var min_range_x = min(p1.x, p2.x) - safe_zone_aabb
-			var max_range_x = max(p1.x, p2.x) + safe_zone_aabb
-			var min_range_y = min(p1.y, p2.y) - safe_zone_aabb
-			var max_range_y = max(p1.y, p2.y) + safe_zone_aabb
-			var rect = Rect2(min_range_x, min_range_y, max_range_x - min_range_x, max_range_y - min_range_y)
-			
-			if rect.has_point(pos):
-				on_the_path = true
-				break 
-			
-			if dist <= max_build_dist:
-				within_build_zone = true
-		
-		if on_the_path: return false
-		if not within_build_zone: return false
-		
-		return true
+func is_valid_ground(_pos: Vector2) -> bool:
 	return false

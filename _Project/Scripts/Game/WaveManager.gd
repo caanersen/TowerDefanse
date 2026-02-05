@@ -6,10 +6,12 @@ signal on_enemy_reward(amount)
 
 @export var goblin_scene: PackedScene
 @export var troll_scene: PackedScene
-@export var warg_scene: PackedScene # Editor'den atanamazsa initialize'da yüklenir
+@export var warg_scene: PackedScene 
+@export var gargoyle_scene: PackedScene
+@export var black_knight_scene: PackedScene
 
 # Export artık gerekli değil veya boş olabilir, initialize ile atanacak
-var spawn_path: Path2D 
+var spawn_paths: Array = [] 
 
 var current_wave: int = 0
 var enemies_to_spawn: int = 0
@@ -24,18 +26,27 @@ func _ready() -> void:
 	
 	# start_next_wave'i LevelController çağıracak (initialize sonrası)
 
-func initialize(path_node: Path2D) -> void:
-	spawn_path = path_node
+func initialize(path_nodes: Array) -> void:
+	spawn_paths = path_nodes
 	if warg_scene == null:
 		warg_scene = load("res://_Project/Scenes/Entities/Enemies/Warg.tscn")
-	print("WaveManager initialized with path.")
+	if gargoyle_scene == null:
+		gargoyle_scene = load("res://_Project/Scenes/Entities/Enemies/Gargoyle.tscn")
+	if black_knight_scene == null:
+		black_knight_scene = load("res://_Project/Scenes/Entities/Enemies/BlackKnight.tscn")
+	print("WaveManager initialized with ", spawn_paths.size(), " paths.")
 
 func start_next_wave() -> void:
 	current_wave += 1
 	var base_count = 10
-	# Formül: Linear Scaling. Her wave +5 düşman.
-	# Wave 1: 10, Wave 2: 15, ..., Wave 10: 55
-	enemies_to_spawn = base_count + (current_wave - 1) * 5
+	var scaling = 5
+	
+	# LEVEL 2 ZORLUK AYARI
+	if GameManager.selected_level == 2:
+		base_count = 15 # Daha kalabalık başla
+		scaling = 8 # Daha hızlı art
+	
+	enemies_to_spawn = base_count + (current_wave - 1) * scaling
 	
 	emit_signal("wave_started", current_wave)
 	print("Wave ", current_wave, " started! Enemies: ", enemies_to_spawn)
@@ -47,41 +58,60 @@ func _spawn_enemy() -> void:
 		return
 	
 	var enemy_instance
+	var level = GameManager.selected_level
 	
-	# WAVE LOGIC
-	if current_wave == 10:
-		# BOSS WAVE
+	# BASİT WAVE MANTIĞI (Level 2 için genişletildi)
+	var is_hard_wave = (current_wave >= 8)
+	if level == 2: is_hard_wave = (current_wave >= 6) # Level 2'de zorluk erken başlar
+	
+	var max_waves = 10
+	if level == 2: max_waves = 13
+	
+	if current_wave == max_waves:
+		# FINAL BOSS WAVE
 		if enemies_to_spawn <= 5: # Son 5 düşman Troll
 			enemy_instance = troll_scene.instantiate()
 		else:
-			# Geri kalanı Warg sürüsü
-			enemy_instance = warg_scene.instantiate()
+			enemy_instance = warg_scene.instantiate() # Geri kalanı Warg
 	
-	elif current_wave >= 8:
-		# HARD WAVES (Warg + Troll + Goblin)
+	elif current_wave > 10 and level == 2:
+		# LEVEL 2 EXTRA WAVES (11, 12) -> Full Kaos + Flying + Armored
+		var r = randf()
+		if r < 0.3: enemy_instance = black_knight_scene.instantiate()
+		elif r < 0.5: enemy_instance = gargoyle_scene.instantiate()
+		elif r < 0.7: enemy_instance = warg_scene.instantiate()
+		else: enemy_instance = troll_scene.instantiate()
+		
+	elif is_hard_wave:
+		# HARD WAVES (Warg + Troll + Goblin + Black Knight)
 		var roll = randf()
-		if roll < 0.4: enemy_instance = warg_scene.instantiate()
+		if roll < 0.2: enemy_instance = black_knight_scene.instantiate()
+		elif roll < 0.4: enemy_instance = warg_scene.instantiate()
 		elif roll < 0.5: enemy_instance = troll_scene.instantiate() # Nadir Troll
 		else: enemy_instance = goblin_scene.instantiate()
 		
 	elif current_wave >= 5:
-		# MID WAVES (Goblin + Warg)
-		if randf() < 0.3: # %30 Warg
-			enemy_instance = warg_scene.instantiate()
-		else:
-			enemy_instance = goblin_scene.instantiate()
+		# MID WAVES (Goblin + Warg + Gargoyle)
+		var r = randf()
+		if r < 0.2: enemy_instance = gargoyle_scene.instantiate() # %20 Gargoyle
+		elif r < 0.4: enemy_instance = warg_scene.instantiate() # %20 Warg
+		else: enemy_instance = goblin_scene.instantiate()
 	
 	else:
 		# EASY WAVES
 		enemy_instance = goblin_scene.instantiate()
 	
 	if enemy_instance:
-		spawn_path.add_child(enemy_instance)
-		enemy_instance.died.connect(_on_enemy_died)
-		enemy_instance.reached_base.connect(_on_enemy_reached_base) # Bağla
-		enemies_alive += 1
+		if spawn_paths.size() > 0:
+			var random_path = spawn_paths.pick_random()
+			random_path.add_child(enemy_instance)
+			enemy_instance.died.connect(_on_enemy_died)
+			enemy_instance.reached_base.connect(_on_enemy_reached_base) # Bağla
+			enemies_alive += 1
 	
 	enemies_to_spawn -= 1
+
+# ...
 
 func _on_enemy_reached_base(_enemy) -> void:
 	enemies_alive -= 1
@@ -106,7 +136,10 @@ func _on_wave_completed() -> void:
 	print("Wave ", current_wave, " completed!")
 	emit_signal("wave_ended", current_wave)
 	
-	if current_wave >= 10:
+	var max_waves = 10
+	if GameManager.selected_level == 2: max_waves = 13
+	
+	if current_wave >= max_waves:
 		# Oyun Bitti (Kazanıldı)
 		print("Level Completed!")
 		GameManager.unlock_next_level()

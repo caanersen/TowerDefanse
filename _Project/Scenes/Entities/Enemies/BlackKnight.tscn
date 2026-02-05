@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3 uid="uid://cqty21eoamfqo"]
+
+[ext_resource type="Script" path="res://_Project/Scripts/Entities/BaseEnemy.gd" id="1_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_blackknight"]
+size = Vector2(40, 40)
+
+[node name="BlackKnight" type="PathFollow2D"]
+rotates = false
+loop = false
+script = ExtResource("1_script")
+speed = 35.0
+max_health = 300
+gold_reward = 15
+physical_armor = 5
+is_flying = false
+
+[node name="Sprite" type="ColorRect" parent="."]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.15, 0.15, 0.15, 1)
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_blackknight")

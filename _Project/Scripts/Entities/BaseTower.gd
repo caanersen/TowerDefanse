@@ -1,17 +1,19 @@
 extends Node2D
-class_name BaseTower
+# class_name BaseTower # Commented out to fix conflict
 
 @export var attack_range: float = 200.0
 @export var damage: int = 10
 @export var fire_rate: float = 1.0
+@export var can_target_flying: bool = true
 @export var projectile_scene: PackedScene
 
 var level: int = 1
 var max_level: int = 3
+var total_cost: int = 0 # Toplam harcanan miktar
 
 var can_shoot: bool = true
-var target: BaseEnemy = null
-var enemies_in_range: Array[BaseEnemy] = []
+var target: Node2D = null # BaseEnemy removed
+var enemies_in_range: Array[Node2D] = [] # BaseEnemy removed
 var is_selected: bool = false
 
 @onready var timer: Timer = Timer.new()
@@ -80,12 +82,16 @@ func _start_cooldown() -> void:
 func _find_new_target() -> void:
 	# Menzildeki en öndeki düşmanı seç (progress'i en büyük olan)
 	var max_progress: float = -1.0
-	var best_target: BaseEnemy = null
+	var best_target: Node2D = null
 	
 	# Listeyi temizle (ölenler gitmiş olabilir)
 	enemies_in_range = enemies_in_range.filter(func(e): return is_instance_valid(e))
 	
 	for enemy in enemies_in_range:
+		# Uçan düşman kontrolü
+		if enemy.get("is_flying") and not can_target_flying:
+			continue
+			
 		# Extra mesafe kontrolü (Area2D bazen kaçırabilir)
 		if global_position.distance_to(enemy.global_position) > attack_range + 50.0:
 			continue
@@ -115,12 +121,12 @@ func _on_timer_timeout() -> void:
 # Düşman tespiti (Düşmanlarda Area2D olmalı)
 func _on_area_entered(area: Area2D) -> void:
 	var parent = area.get_parent()
-	if parent is BaseEnemy:
+	if parent.is_in_group("enemies"): # Group check is safer without class_name
 		enemies_in_range.append(parent)
 
 func _on_area_exited(area: Area2D) -> void:
 	var parent = area.get_parent()
-	if parent is BaseEnemy:
+	if parent.is_in_group("enemies"):
 		enemies_in_range.erase(parent)
 		if target == parent:
 			target = null
@@ -135,6 +141,10 @@ func upgrade() -> void:
 	scale *= 1.1
 	update_range_shape()
 	print(name, " upgraded to level ", level, ". Damage: ", damage)
+
+func get_sell_refund() -> int:
+	# Satış fiyatı: Toplam maliyetin %80'i
+	return int(total_cost * 0.8)
 
 func check_clicked(pos: Vector2) -> bool:
 	# Mesafe kontrolü (Daha güvenilir)

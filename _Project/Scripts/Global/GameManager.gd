@@ -1,6 +1,6 @@
 extends Node
 
-var unlocked_levels: int = 1
+var unlocked_levels: int = 10 # Şimdilik hepsi açık (Test)
 var selected_level: int = 1
 
 func _ready() -> void:
